@@ -2,7 +2,7 @@
 
 A simple, privacy-first PDF cropping tool that runs entirely in your browser — no uploads, no servers, no accounts.
 
-![PDF Cleaver screenshot](./screenshot.png)
+![PDF Cleaver screenshot](screenshot.png)
 
 ## Features
 
@@ -11,7 +11,7 @@ A simple, privacy-first PDF cropping tool that runs entirely in your browser —
 - **Page navigation** — crop a single page or apply the same crop to all pages
 - **Zoom controls** — zoom in/out or fit the page to the window
 - **Instant download** — saves as `<original-name>_cropped.pdf`
-- **100% offline after first load** — your files never leave your device
+- **100% offline** — your files never leave your device
 
 ## Usage
 
