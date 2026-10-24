@@ -2,7 +2,7 @@
 
 A simple, privacy-first PDF cropping tool that runs entirely in your browser — no uploads, no servers, no accounts.
 
-![PDF Cleaver screenshot](https://raw.githubusercontent.com/vhoudoverdov/pdf-cleaver/main/screenshot.png)
+![PDF Cleaver screenshot](screenshot.png)
 
 ## Features
 
