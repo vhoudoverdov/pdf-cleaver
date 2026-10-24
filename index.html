@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Cleaver</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --accent:    #6c63ff;
+      --accent2:   #a78bfa;
+      --text:      #e4e6f1;
+      --muted:     #8b8fad;
+      --danger:    #f87171;
+      --success:   #34d399;
+      --radius:    12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header .logo { display: flex; align-items: center; gap: 10px; }
+    header .logo svg { width: 30px; height: 30px; }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header .spacer { flex: 1; }
+
+    button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform .12s, box-shadow .12s, background .15s, opacity .15s;
+    }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      padding: 9px 20px;
+      box-shadow: 0 4px 18px rgba(108,99,255,.35);
+    }
+    .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 6px 24px rgba(108,99,255,.55);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      padding: 9px 18px;
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: #2a3050; border-color: var(--accent); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      padding: 6px 12px;
+    }
+    .btn-ghost:hover { color: var(--text); background: var(--surface2); }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #toolbar .sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+    #page-info {
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #page-info input[type=number] {
+      width: 44px;
+      text-align: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 4px;
+    }
+    #zoom-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      min-width: 44px;
+      text-align: center;
+    }
+    #selection-info {
+      font-size: 0.78rem;
+      color: var(--accent2);
+      background: rgba(108,99,255,.12);
+      border: 1px solid rgba(108,99,255,.25);
+      border-radius: 6px;
+      padding: 4px 10px;
+      display: none;
+    }
+
+    #main { flex: 1; display: flex; overflow: hidden; }
+
+    #drop-zone {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      cursor: pointer;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      margin: 32px;
+      transition: border-color .2s, background .2s;
+    }
+    #drop-zone.drag-over { border-color: var(--accent); background: rgba(108,99,255,.06); }
+    #drop-zone svg { opacity: 0.35; }
+    #drop-zone h2 { font-size: 1.2rem; font-weight: 500; color: var(--muted); }
+    #drop-zone p { font-size: 0.85rem; color: var(--muted); opacity: 0.7; }
+    #file-input { display: none; }
+
+    #canvas-viewport {
+      flex: 1;
+      overflow: auto;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 28px;
+      background: #090b10;
+    }
+    #canvas-wrap {
+      position: relative;
+      display: inline-block;
+      box-shadow: 0 8px 48px rgba(0,0,0,.7);
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: crosshair;
+      user-select: none;
+    }
+    #pdf-canvas { display: block; }
+    #sel-canvas { position: absolute; inset: 0; pointer-events: none; }
+
+    #canvas-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+    #canvas-viewport::-webkit-scrollbar-track { background: transparent; }
+    #canvas-viewport::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.success { border-color: var(--success); color: var(--success); }
+    #toast.error   { border-color: var(--danger);  color: var(--danger);  }
+
+    #loading {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(9,11,16,.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #loading.show { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #scope-wrap { display: flex; gap: 6px; align-items: center; }
+    #scope-wrap label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #scope-wrap label input[type=radio] { accent-color: var(--accent); cursor: pointer; }
+    .spacer { flex: 1; }
+
+    footer {
+      flex-shrink: 0;
+      text-align: center;
+      padding: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .15s;
+    }
+    footer a:hover { color: var(--accent2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="8" fill="url(#hg)"/>
+      <path d="M8 10h9M8 14h7M8 18h5M8 22h8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+      <rect x="17" y="15" width="9" height="9" rx="1.5" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="2.5 1.5"/>
+      <defs>
+        <linearGradient id="hg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#6c63ff"/>
+          <stop offset="1" stop-color="#a78bfa"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <h1>PDF Cleaver</h1>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-ghost" id="open-new-btn" style="display:none">Open different PDF</button>
+</header>
+
+<div id="toolbar" style="display:none">
+  <button class="btn-secondary" id="prev-btn">&#8592;</button>
+  <div id="page-info">
+    Page <input id="page-num-input" type="number" min="1" value="1" /> of <span id="total-pages">1</span>
+  </div>
+  <button class="btn-secondary" id="next-btn">&#8594;</button>
+  <div class="sep"></div>
+  <button class="btn-ghost" id="zoom-out-btn">&#8722;</button>
+  <span id="zoom-label">100%</span>
+  <button class="btn-ghost" id="zoom-in-btn">&#43;</button>
+  <button class="btn-ghost" id="zoom-fit-btn" style="font-size:.78rem">Fit</button>
+  <div class="sep"></div>
+  <div id="scope-wrap">
+    <label><input type="radio" name="scope" value="current" checked> This page only</label>
+    <label><input type="radio" name="scope" value="all"> All pages</label>
+  </div>
+  <div class="sep"></div>
+  <span id="selection-info"></span>
+  <div class="spacer"></div>
+  <button class="btn-secondary" id="clear-btn" disabled>Clear selection</button>
+  <button class="btn-primary"   id="crop-btn"  disabled>Crop &amp; Save</button>
+</div>
+
+<div id="main">
+  <div id="drop-zone">
+    <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+      <rect x="10" y="6" width="40" height="52" rx="5" stroke="#8b8fad" stroke-width="2.5"/>
+      <path d="M34 6v12h16" stroke="#8b8fad" stroke-width="2.5" stroke-linejoin="round"/>
+      <rect x="30" y="35" width="26" height="26" rx="4" fill="none" stroke="#6c63ff" stroke-width="2.5" stroke-dasharray="4 2.5"/>
+      <path d="M43 44v6M40 47h6" stroke="#6c63ff" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <h2>Drop a PDF here</h2>
+    <p>or click to browse</p>
+    <button class="btn-primary" id="browse-btn" onclick="event.stopPropagation()">Browse PDF</button>
+    <input id="file-input" type="file" accept=".pdf,application/pdf" />
+  </div>
+
+  <div id="canvas-viewport">
+    <div id="loading"><div class="spinner"></div></div>
+    <div id="canvas-wrap">
+      <canvas id="pdf-canvas"></canvas>
+      <canvas id="sel-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<footer>
+  <a href="https://antigravity.google/" target="_blank" rel="noopener noreferrer">Made with Google Antigravity. 2026</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        integrity="sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"
+        integrity="sha512-z8IYLHO8bTgFqj+yrPyIJnzBDf7DDhWwiEsk4sY+Oe6J2M+WQequeGS7qioI5vT6rXgVRb4K1UVQC5ER7MKzKQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+'use strict';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const dropZone     = document.getElementById('drop-zone');
+const canvasVp     = document.getElementById('canvas-viewport');
+const canvasWrap   = document.getElementById('canvas-wrap');
+const pdfCanvas    = document.getElementById('pdf-canvas');
+const selCanvas    = document.getElementById('sel-canvas');
+const toolbar      = document.getElementById('toolbar');
+const openNewBtn   = document.getElementById('open-new-btn');
+const prevBtn      = document.getElementById('prev-btn');
+const nextBtn      = document.getElementById('next-btn');
+const pageNumInput = document.getElementById('page-num-input');
+const totalPagesEl = document.getElementById('total-pages');
+const zoomLabel    = document.getElementById('zoom-label');
+const zoomInBtn    = document.getElementById('zoom-in-btn');
+const zoomOutBtn   = document.getElementById('zoom-out-btn');
+const zoomFitBtn   = document.getElementById('zoom-fit-btn');
+const clearBtn     = document.getElementById('clear-btn');
+const cropBtn      = document.getElementById('crop-btn');
+const selInfo      = document.getElementById('selection-info');
+const fileInput    = document.getElementById('file-input');
+const loading      = document.getElementById('loading');
+const toast        = document.getElementById('toast');
+
+const pdfCtx = pdfCanvas.getContext('2d');
+const selCtx = selCanvas.getContext('2d');
+
+let pdfDoc      = null;
+let pdfBytes    = null;
+let currentPage = 1;
+let totalPages  = 1;
+let scale       = 1.5;
+let viewport    = null;
+let renderTask  = null;
+let sel         = null;
+let dragging    = false;
+let dragStart   = {x:0, y:0};
+
+// ── Toast ─────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  clearTimeout(toastTimer);
+  toast.textContent = msg;
+  toast.className = 'show ' + type;
+  toastTimer = setTimeout(() => { toast.className = ''; }, 3200);
+}
+
+function setLoading(on) {
+  loading.classList.toggle('show', on);
+}
+
+// ── File open ─────────────────────────────────
+async function openFile(file) {
+  if (!file || (!file.type.includes('pdf') && !file.name.endsWith('.pdf'))) {
+    showToast('Please open a PDF file.', 'error'); return;
+  }
+  setLoading(true);
+  try {
+    pdfBytes    = await file.arrayBuffer();
+    pdfDoc      = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+    totalPages  = pdfDoc.numPages;
+    currentPage = 1;
+    sel         = null;
+
+    totalPagesEl.textContent = totalPages;
+    pageNumInput.value       = 1;
+    pageNumInput.max         = totalPages;
+
+    dropZone.style.display   = 'none';
+    canvasVp.style.display   = 'flex';
+    toolbar.style.display    = 'flex';
+    openNewBtn.style.display = 'inline-flex';
+
+    updateNav();
+    await doFit();
+    updateSelUI();
+  } catch(e) {
+    showToast('Failed to open PDF: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Render ──────────────────────────────────
+async function renderCurrentPage() {
+  if (!pdfDoc) return;
+  if (renderTask) { renderTask.cancel(); renderTask = null; }
+
+  const page = await pdfDoc.getPage(currentPage);
+  viewport   = page.getViewport({ scale });
+
+  const w = Math.round(viewport.width);
+  const h = Math.round(viewport.height);
+  pdfCanvas.width  = selCanvas.width  = w;
+  pdfCanvas.height = selCanvas.height = h;
+  pdfCanvas.style.width  = selCanvas.style.width  = w + 'px';
+  pdfCanvas.style.height = selCanvas.style.height = h + 'px';
+
+  try {
+    renderTask = page.render({ canvasContext: pdfCtx, viewport });
+    await renderTask.promise;
+  } catch(e) {
+    if (e.name !== 'RenderingCancelledException') throw e;
+  }
+  zoomLabel.textContent = Math.round(scale * 100) + '%';
+}
+
+async function doFit() {
+  const page = await pdfDoc.getPage(currentPage);
+  const vp1  = page.getViewport({ scale: 1 });
+  const vw   = canvasVp.clientWidth - 56;
+  const vh   = canvasVp.clientHeight - 56;
+  scale = Math.max(0.25, Math.min(3, Math.min(vw / vp1.width, vh / vp1.height)));
+  await renderCurrentPage();
+}
+
+// ── Navigation ──────────────────────────────
+function updateNav() {
+  prevBtn.disabled = currentPage <= 1;
+  nextBtn.disabled = currentPage >= totalPages;
+}
+
+async function goToPage(n) {
+  n = Math.max(1, Math.min(totalPages, n));
+  if (n === currentPage) return;
+  currentPage = n;
+  pageNumInput.value = n;
+  sel = null;
+  updateNav();
+  setLoading(true);
+  await renderCurrentPage();
+  updateSelUI();
+  setLoading(false);
+}
+
+prevBtn.addEventListener('click', () => goToPage(currentPage - 1));
+nextBtn.addEventListener('click', () => goToPage(currentPage + 1));
+pageNumInput.addEventListener('change', () => goToPage(parseInt(pageNumInput.value) || 1));
+
+// ── Zoom ────────────────────────────────────
+async function changeZoom(delta) {
+  scale = Math.max(0.25, Math.min(4, scale + delta));
+  sel = null;
+  setLoading(true);
+  await renderCurrentPage();
+  updateSelUI();
+  setLoading(false);
+}
+zoomInBtn.addEventListener('click',  () => changeZoom(+0.25));
+zoomOutBtn.addEventListener('click', () => changeZoom(-0.25));
+zoomFitBtn.addEventListener('click', async () => { setLoading(true); await doFit(); setLoading(false); });
+
+// ── Selection ───────────────────────────────
+function canvasPoint(e) {
+  const r = selCanvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+canvasWrap.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  dragging  = true;
+  dragStart = canvasPoint(e);
+  sel = null;
+  clearSelCanvas();
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const cur = canvasPoint(e);
+  sel = {
+    x: Math.min(dragStart.x, cur.x),
+    y: Math.min(dragStart.y, cur.y),
+    w: Math.abs(cur.x - dragStart.x),
+    h: Math.abs(cur.y - dragStart.y)
+  };
+  drawSel();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  if (sel && (sel.w < 4 || sel.h < 4)) { sel = null; clearSelCanvas(); }
+  updateSelUI();
+});
+
+function clearSelCanvas() {
+  selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+}
+
+function clampedSel() {
+  if (!sel) return null;
+  const x  = Math.max(0, Math.min(sel.x, pdfCanvas.width));
+  const y  = Math.max(0, Math.min(sel.y, pdfCanvas.height));
+  const x2 = Math.max(0, Math.min(sel.x + sel.w, pdfCanvas.width));
+  const y2 = Math.max(0, Math.min(sel.y + sel.h, pdfCanvas.height));
+  return {x, y, w: x2 - x, h: y2 - y};
+}
+
+function drawSel() {
+  clearSelCanvas();
+  if (!sel) return;
+  const {x,y,w,h} = clampedSel();
+  selCtx.fillStyle = 'rgba(0,0,0,0.45)';
+  selCtx.fillRect(0, 0, selCanvas.width, selCanvas.height);
+  selCtx.clearRect(x, y, w, h);
+  selCtx.strokeStyle = '#6c63ff';
+  selCtx.lineWidth = 2;
+  selCtx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  const hs = 7;
+  selCtx.fillStyle = '#a78bfa';
+  [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([cx,cy]) => {
+    selCtx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
+  });
+}
+
+function updateSelUI() {
+  const ok = sel && sel.w >= 4 && sel.h >= 4;
+  clearBtn.disabled = !ok;
+  cropBtn.disabled  = !ok;
+  if (ok && viewport) {
+    const cs = clampedSel();
+    const pw = Math.round(cs.w / viewport.scale);
+    const ph = Math.round(cs.h / viewport.scale);
+    selInfo.textContent = `Selection: ${pw} \u00d7 ${ph} pt`;
+    selInfo.style.display = 'inline-block';
+  } else {
+    selInfo.style.display = 'none';
+  }
+  drawSel();
+}
+
+clearBtn.addEventListener('click', () => { sel = null; clearSelCanvas(); updateSelUI(); });
+
+// ── Crop & save ─────────────────────────────
+cropBtn.addEventListener('click', async () => {
+  if (!sel || !pdfDoc || !pdfBytes) return;
+  const scope = document.querySelector('input[name=scope]:checked').value;
+  const cs = clampedSel();
+  if (!cs || cs.w < 4 || cs.h < 4) { showToast('Selection too small', 'error'); return; }
+
+  setLoading(true);
+  try {
+    const scl   = viewport.scale;
+    const pageH = viewport.height;
+
+    const cropX = cs.x / scl;
+    const cropY = (pageH - (cs.y + cs.h)) / scl;
+    const cropW = cs.w / scl;
+    const cropH = cs.h / scl;
+
+    const libDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    const pages  = libDoc.getPages();
+
+    const targets = scope === 'all' ? pages.map((_,i) => i) : [currentPage - 1];
+    for (const pi of targets) {
+      const p = pages[pi];
+      const {width, height} = p.getSize();
+      const bx1 = Math.max(0, cropX);
+      const by1 = Math.max(0, cropY);
+      const bx2 = Math.min(width,  cropX + cropW);
+      const by2 = Math.min(height, cropY + cropH);
+      if (bx2 > bx1 && by2 > by1) p.setCropBox(bx1, by1, bx2 - bx1, by2 - by1);
+    }
+
+    const out  = await libDoc.save();
+    const name = (fileInput.files[0]?.name || 'document.pdf').replace(/\.pdf$/i,'') + '_cropped.pdf';
+    await saveFile(out, name);
+  } catch(e) {
+    showToast('Crop failed: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+});
+
+// ── Save helper: prefer showSaveFilePicker, fallback to blob download ──
+async function saveFile(bytes, suggestedName) {
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(bytes);
+      await writable.close();
+      showToast('Cropped PDF saved!', 'success');
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      // Fall through to blob download on other errors
+    }
+  }
+  // Fallback for Firefox / unsupported browsers
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = suggestedName; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  showToast('Cropped PDF saved to Downloads!', 'success');
+}
+
+// ── Drag & drop ─────────────────────────────────────
+dropZone.addEventListener('click', () => fileInput.click());
+document.getElementById('browse-btn').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) openFile(e.target.files[0]); });
+
+['dragover','drop'].forEach(ev => {
+  dropZone.addEventListener(ev, e => {
+    e.preventDefault();
+    if (ev === 'dragover') dropZone.classList.add('drag-over');
+    else { dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); }
+  });
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+canvasVp.addEventListener('dragover',  e => e.preventDefault());
+canvasVp.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
+openNewBtn.addEventListener('click', () => fileInput.click());
+
+// ── Keyboard shortcuts ───────────────────────────
+document.addEventListener('keydown', e => {
+  if (!pdfDoc) return;
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT') return;
+  if (e.key === 'ArrowLeft')  prevBtn.click();
+  if (e.key === 'ArrowRight') nextBtn.click();
+  if (e.key === '+' || e.key === '=') zoomInBtn.click();
+  if (e.key === '-')  zoomOutBtn.click();
+  if (e.key === 'Escape') clearBtn.click();
+  if (e.key === 'Enter' && !cropBtn.disabled) cropBtn.click();
+});
+</script>
+</body>
+</html>
